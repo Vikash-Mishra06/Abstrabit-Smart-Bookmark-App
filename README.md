@@ -1,93 +1,91 @@
 # Smart Bookmark App
 
-This project is a simple full-stack bookmark manager built as part of a screening assignment.
+This project was built as part of a screening assignment.
 
-The application allows users to sign in with Google, save personal bookmarks, delete them, and see updates in real time across multiple browser tabs.
-
----
-
-## Assignment Requirements Implemented
-
-The following requirements from the assignment are implemented:
-
-✔ Google Authentication using Supabase Auth  
-✔ Bookmark creation (title + URL)  
-✔ Bookmark deletion  
-✔ Per-user data privacy  
-✔ Real-time updates across tabs (Supabase Realtime)  
-✔ Next.js App Router architecture  
-✔ Tailwind CSS basic styling  
+The app allows users to sign in with Google, add bookmarks, delete them, and see updates in real time.
 
 ---
 
-## Tech Stack Used
+## Features
+
+- Google login using Supabase Auth
+- Add bookmark (title + URL)
+- Delete bookmark
+- Realtime updates across tabs
+- Each user sees only their own bookmarks
+
+---
+
+## Tech Stack
 
 - Next.js (App Router)
-- Supabase (Authentication, Database, Realtime)
-- Postgres (via Supabase)
+- Supabase (Auth, Database, Realtime)
 - Tailwind CSS
 
 ---
 
-## Application Behavior
+## How It Works
 
-1. Users sign in using Google OAuth (no passwords).
-2. Authenticated users can add bookmarks with a title and URL.
-3. Users can delete their bookmarks.
-4. Each user only sees their own bookmarks.
-5. Changes sync instantly across browser tabs.
+After login, users can save bookmarks with a title and URL.
+
+Bookmarks are stored in Supabase Postgres database and linked to the logged-in user.
+
+When bookmarks are added or removed, changes appear automatically across browser tabs.
 
 ---
 
-## Data Privacy
+## Data Privacy (RLS)
 
-User data isolation is enforced using Supabase Row Level Security (RLS).
+Row Level Security is enabled on the bookmarks table.
 
-Bookmarks are associated with a user via:
+Policy used:
 
 user_id = auth.uid()
 
-This ensures users cannot access or modify other users’ data.
+This makes sure users can only access their own data.
 
 ---
 
-## Realtime Updates
+## Problems I Faced
 
-Supabase realtime subscriptions are used to listen for database changes.
+**1. Realtime updates were not working**
 
-When bookmarks are added or deleted, all open tabs update automatically without manual refresh.
+Initially bookmarks were not syncing across tabs.
 
----
+Reason was realtime not enabled on the table.
 
-## Input Validation
-
-Basic client-side validation is implemented:
-
-- Empty title prevention
-- Empty URL prevention
-- URL format validation
+**Fix:**  
+Enabled realtime from Supabase dashboard.
 
 ---
 
-## UX Decisions
+**2. RLS policy confusion**
 
-Optimistic UI updates are used so that:
+While creating policies I accidentally set incorrect rules which blocked queries.
 
-- Bookmarks appear immediately after adding
-- Bookmarks disappear immediately after deletion
+**Fix:**  
+Updated policies to use:
 
-Database operations run in the background.
+user_id = auth.uid()
 
 ---
 
-## Possible Improvements
+**3. UI felt slightly delayed**
 
-If extended further, the application could support:
+After insert/delete, UI updates were not instant.
 
-- Bookmark editing
+**Fix:**  
+Used optimistic UI updates to improve responsiveness.
+
+---
+
+## Improvements Possible
+
+If extended further:
+
+- Edit bookmark
+- Search / filter bookmarks
 - Better error handling UI
-- Bookmark search / filtering
-- Metadata extraction (favicon/title)
 
 ---
 
@@ -100,4 +98,4 @@ npm run dev
 
 ## Deployment
 
-Designed to be deployed using Vercel.
+Deployed using Vercel.

@@ -99,3 +99,4 @@ npm run dev
 ## Deployment
 
 Deployed using Vercel.
+https://abstrabit-smart-bookmark-app.vercel.app

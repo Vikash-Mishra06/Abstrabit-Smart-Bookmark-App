@@ -3,30 +3,72 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import type { User } from "@supabase/supabase-js";
+
+type Bookmark = {
+  id: string;
+  title: string;
+  url: string;
+  user_id: string;
+  created_at: string;
+};
 
 export default function HomePage() {
   const router = useRouter();
 
   // store logged in user
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   // form inputs
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
 
   // bookmarks list
-  const [bookmarks, setBookmarks] = useState<any[]>([]);
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+
+  const loadBookmarksForUser = async (userId: string): Promise<Bookmark[]> => {
+    const { data } = await supabase
+      .from("bookmarks")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    return (data as Bookmark[]) || [];
+  };
 
   // check session when page loads
   useEffect(() => {
-    checkUser();
-  }, []);
+    let isMounted = true;
+
+    void supabase.auth.getUser().then(({ data }) => {
+      if (!isMounted) return;
+
+      if (!data.user) {
+        router.push("/login");
+        return;
+      }
+
+      setUser(data.user);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
 
   // once user available → load data + realtime
   useEffect(() => {
     if (!user) return;
 
-    fetchBookmarks(user.id);
+    let isMounted = true;
+    const refreshBookmarks = () => {
+      void loadBookmarksForUser(user.id).then((data) => {
+        if (!isMounted) return;
+        setBookmarks(data);
+      });
+    };
+
+    refreshBookmarks();
 
     // listen for DB changes
     const channel = supabase
@@ -36,39 +78,20 @@ export default function HomePage() {
         { event: "*", schema: "public", table: "bookmarks" },
         () => {
           // refresh list if something changed
-          fetchBookmarks(user.id);
+          refreshBookmarks();
         },
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      isMounted = false;
+      void supabase.removeChannel(channel);
     };
   }, [user]);
 
-  // get current logged in user
-  const checkUser = async () => {
-    const { data } = await supabase.auth.getUser();
-
-    if (!data.user) {
-      router.push("/login");
-    } else {
-      setUser(data.user);
-    }
-  };
-
-  // load bookmarks for user
-  const fetchBookmarks = async (userId: string) => {
-    const { data } = await supabase
-      .from("bookmarks")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false });
-
-    setBookmarks(data || []);
-  };
-
   const addBookmark = async () => {
+    if (!user) return;
+
     if (!title.trim()) {
       alert("Title required");
       return;

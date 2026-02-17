@@ -7,31 +7,37 @@ import { useRouter } from "next/navigation";
 export default function HomePage() {
   const router = useRouter();
 
+  // store logged in user
   const [user, setUser] = useState<any>(null);
+
+  // form inputs
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
+
+  // bookmarks list
   const [bookmarks, setBookmarks] = useState<any[]>([]);
 
-  // initial auth check on page load
+  // check session when page loads
   useEffect(() => {
     checkUser();
   }, []);
 
-  // setup realtime subscription once user is available
+  // once user available → load data + realtime
   useEffect(() => {
     if (!user) return;
 
     fetchBookmarks(user.id);
 
+    // listen for DB changes
     const channel = supabase
       .channel("bookmarks-realtime")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bookmarks" },
         () => {
-          // refresh bookmarks when DB changes
+          // refresh list if something changed
           fetchBookmarks(user.id);
-        }
+        },
       )
       .subscribe();
 
@@ -40,6 +46,7 @@ export default function HomePage() {
     };
   }, [user]);
 
+  // get current logged in user
   const checkUser = async () => {
     const { data } = await supabase.auth.getUser();
 
@@ -50,6 +57,7 @@ export default function HomePage() {
     }
   };
 
+  // load bookmarks for user
   const fetchBookmarks = async (userId: string) => {
     const { data } = await supabase
       .from("bookmarks")
@@ -71,27 +79,30 @@ export default function HomePage() {
       return;
     }
 
+    // basic URL validation
     try {
-      new URL(url); // basic URL validation
+      new URL(url);
     } catch {
       alert("Invalid URL");
       return;
     }
 
+    // temporary object for instant UI
     const tempBookmark = {
-      id: crypto.randomUUID(), // temporary client-side ID
+      id: crypto.randomUUID(),
       title,
       url,
       user_id: user.id,
       created_at: new Date().toISOString(),
     };
 
-    // optimistic update for faster UI response
+    // optimistic update → feels faster
     setBookmarks((prev) => [tempBookmark, ...prev]);
 
     setTitle("");
     setUrl("");
 
+    // insert into DB
     await supabase.from("bookmarks").insert([
       {
         title: tempBookmark.title,
@@ -102,7 +113,7 @@ export default function HomePage() {
   };
 
   const deleteBookmark = async (id: string) => {
-    // remove immediately for better UX
+    // remove immediately from UI
     setBookmarks((prev) => prev.filter((bm) => bm.id !== id));
 
     await supabase.from("bookmarks").delete().eq("id", id);
@@ -113,68 +124,109 @@ export default function HomePage() {
     router.push("/login");
   };
 
-  if (!user) return <div className="p-10">Loading...</div>;
+  // loading state until user resolved
+  if (!user) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="mx-auto max-w-xl p-10">
-      <button onClick={logout} className="mb-4 text-sm text-gray-500 underline">
-        Logout
-      </button>
+    <div className="min-h-screen bg-transparent px-4 py-12">
+      <div className="mx-auto max-w-2xl">
+        {/* top section */}
+        <header className="mb-10 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-white">
+              Smart Bookmarks
+            </h1>
+            <p className="text-zinc-400">
+              Save and organize your favorite links
+            </p>
+          </div>
 
-      <h1 className="mb-6 text-2xl font-bold">Smart Bookmarks</h1>
-
-      <div className="mb-4 flex flex-col gap-2">
-        <input
-          className="rounded border p-2"
-          placeholder="Title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-
-        <input
-          className="rounded border p-2"
-          placeholder="URL"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-        />
-
-        <button
-          onClick={addBookmark}
-          className="rounded bg-black py-2 text-white"
-        >
-          Add Bookmark
-        </button>
-      </div>
-
-      <div className="flex flex-col gap-3">
-        {bookmarks.map((bm) => (
-          <div
-            key={bm.id}
-            className="flex items-center justify-between rounded border p-3"
+          <button
+            onClick={logout}
+            className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white cursor-pointer"
           >
-            <div>
-              <div className="font-semibold">{bm.title}</div>
-              <a
-                href={bm.url}
-                target="_blank"
-                className="text-sm text-blue-600"
-              >
-                {bm.url}
-              </a>
+            Logout
+          </button>
+        </header>
+
+        {/* input container */}
+        <div className="mb-10 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 shadow-xl backdrop-blur-md">
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <input
+                className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-white placeholder-zinc-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                placeholder="Bookmark title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+
+              <input
+                className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-white placeholder-zinc-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                placeholder="https://example.com"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+              />
             </div>
 
             <button
-              onClick={() => deleteBookmark(bm.id)}
-              className="text-red-500"
+              onClick={addBookmark}
+              className="w-full rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white hover:bg-blue-500 active:scale-[0.99] cursor-pointer"
             >
-              Delete
+              Save to Bookmark
             </button>
           </div>
-        ))}
+        </div>
 
-        {bookmarks.length === 0 && (
-          <div className="text-sm text-gray-500">No bookmarks yet</div>
-        )}
+        {/* bookmarks */}
+        <div className="space-y-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            Your Library
+          </h2>
+
+          <div className="grid gap-3">
+            {bookmarks.map((bm) => (
+              <div
+                key={bm.id}
+                className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 hover:border-zinc-700"
+              >
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-semibold text-zinc-100">
+                    {bm.title}
+                  </h3>
+
+                  {/* prevent layout break for long links */}
+                  <a
+                    href={bm.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-sm text-blue-400 hover:underline break-all"
+                  >
+                    {bm.url}
+                  </a>
+                </div>
+
+                <button
+                  onClick={() => deleteBookmark(bm.id)}
+                  className="ml-4 text-sm text-red-500 hover:text-red-400 cursor-pointer"
+                >
+                  Delete
+                </button>
+              </div>
+            ))}
+
+            {bookmarks.length === 0 && (
+              <div className="rounded-xl border border-dashed border-zinc-800 p-6 text-center text-zinc-500">
+                No bookmarks saved yet.
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
